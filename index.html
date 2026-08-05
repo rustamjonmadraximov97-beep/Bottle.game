@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Spin the Bottle Pro - Gift Panel</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -293,7 +295,28 @@
             const extraDegrees = Math.floor(Math.random() * 360) + 1440;
             currentRotation += extraDegrees;
             document.getElementById('bottle').style.transform = `rotate(${currentRotation}deg)`;
-        }
+  // Render serveriga ulanish
+const socket = io('https://bottle-game-oq5s.onrender.com');
+
+socket.on('connect', () => {
+    console.log('Serverga muvaffaqiyatli ulandik! ID:', socket.id);
+    socket.emit('joinTable', { tableId: 'table_1' });
+});
+
+// Shishani real vaqtda aylantirish
+function spinBottleOnline() {
+    const randomAngle = Math.floor(Math.random() * 360) + 1440;
+    socket.emit('spinBottle', { tableId: 'table_1', angle: randomAngle });
+}
+
+socket.on('bottleSpun', (data) => {
+    const bottle = document.getElementById('bottle');
+    if (bottle) {
+        bottle.style.transition = 'transform 4s cubic-bezier(0.15, 0.45, 0.15, 1)';
+        bottle.style.transform = `rotate(${data.angle}deg)`;
+    }
+});
+      }
     </script>
 </body>
 </html>
