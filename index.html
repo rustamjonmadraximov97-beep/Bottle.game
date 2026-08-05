@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Spin the Bottle Pro</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #1e110a;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 12px; background: rgba(0, 0, 0, 0.6);
+            font-size: 13px; font-weight: bold; z-index: 20;
+        }
+        .top-icons { display: flex; gap: 6px; align-items: center; }
+        .icon-btn {
+            background: rgba(255, 255, 255, 0.15); border: none; color: white;
+            padding: 6px; border-radius: 50%; cursor: pointer;
+            width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+            font-size: 12px;
+        }
+        .table-badge {
+            background: rgba(255, 183, 77, 0.2); border: 1px solid #ffb74d;
+            padding: 2px 8px; border-radius: 10px; font-size: 11px; cursor: pointer;
+        }
+
+        /* Game Field */
+        .game-field {
+            flex: 1; position: relative;
+            background: radial-gradient(circle, #965f30 0%, #4a2c11 70%, #2b1708 100%);
+            display: flex; justify-content: center; align-items: center;
+        }
+        .bottle {
+            width: 35px; height: 120px;
+            background: linear-gradient(to right, #b71c1c, #e53935, #c62828);
+            border-radius: 10px 10px 5px 5px; position: absolute;
+            transform-origin: center center; transition: transform 4s cubic-bezier(0.25, 0.1, 0.25, 1);
+            z-index: 10; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        /* Players on Table */
+        .player-card {
+            position: absolute; display: flex; flex-direction: column; align-items: center; font-size: 11px; cursor: pointer;
+        }
+        .avatar {
+            width: 48px; height: 48px; border-radius: 50%; border: 2px solid #ffb74d; object-fit: cover;
+        }
+
+        /* Action Popups (Kiss / Decline) */
+        .action-popup {
+            display: none; position: absolute; background: rgba(0,0,0,0.85);
+            padding: 12px; border-radius: 15px; text-align: center; z-index: 100;
+            border: 1px solid #ffb74d; animation: fadeIn 0.3s ease;
+        }
+        .action-btn-group { display: flex; gap: 8px; margin-top: 8px; justify-content: center; }
+        .action-btn { padding: 6px 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 12px; }
+        .btn-kiss { background: #e91e63; color: white; }
+        .btn-decline { background: #757575; color: white; }
+
+        /* Bottom Panel: Gifts & Chat */
+        .bottom-panel {
+            background: #ffffff; color: #333; border-top-left-radius: 18px; border-top-right-radius: 18px;
+            padding: 8px; display: flex; flex-direction: column; gap: 6px; z-index: 50; max-height: 230px;
+        }
+        .gift-grid {
+            display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; max-height: 100px; overflow-y: auto;
+        }
+        .gift-item {
+            background: #f8f9fa; border-radius: 8px; padding: 4px 2px;
+            display: flex; flex-direction: column; align-items: center; gap: 2px;
+            font-size: 10px; font-weight: bold; cursor: pointer; border: 1px solid #eee;
+        }
+        .gift-item span:first-child { font-size: 16px; }
+
+        /* Chat Area */
+        .chat-box {
+            height: 60px; background: #f0f0f0; border-radius: 8px; padding: 6px; overflow-y: auto; font-size: 11px;
+        }
+        .chat-input-group { display: flex; gap: 4px; }
+        .chat-input { flex: 1; padding: 5px; border-radius: 6px; border: 1px solid #ccc; font-size: 11px; }
+        .send-btn { background: #2e7d32; color: white; border: none; padding: 5px 10px; border-radius: 6px; font-weight: bold; font-size: 11px; }
+
+        /* Modals */
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 200; justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: #26160d; color: white; padding: 15px; border-radius: 15px; width: 90%; max-width: 340px; text-align: center; border: 1px solid #5d3a1a;
+        }
+        .tab-group { display: flex; justify-content: space-around; margin-bottom: 8px; border-bottom: 1px solid #442714; padding-bottom: 4px; font-size: 11px; }
+        .tab-btn { background: none; border: none; font-weight: bold; padding: 4px; cursor: pointer; color: #aaa; }
+        .tab-btn.active { color: #ffb74d; border-bottom: 2px solid #ffb74d; }
+        
+        .shop-item { display: flex; justify-content: space-between; align-items: center; padding: 6px; border-bottom: 1px solid #3d2212; font-size: 11px; }
+        .buy-btn { background: #ff9800; color: white; border: none; padding: 4px 8px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        
+        .table-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #382012; margin-bottom: 4px; border-radius: 8px; font-size: 12px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <!-- Audio Effects -->
+    <audio id="bgMusic" loop src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"></audio>
+
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <span onclick="openModal('shopModal')" style="cursor: pointer;">❤️ <span id="my-hearts">0</span> ➕</span>
+        </div>
+        <div class="table-badge" onclick="openModal('tablesModal')">Стол <span id="currentTableNum">3001</span> 🪑</div>
+        <div class="top-icons">
+            <button class="icon-btn" onclick="openModal('leaderboardModal')">🏆</button>
+            <button class="icon-btn" onclick="openModal('tablesModal')">🪑</button>
+            <button class="icon-btn" onclick="openModal('shopModal')">🛒</button>
+        </div>
+    </div>
+
+    <!-- Game Field -->
+    <div class="game-field">
+        <div class="player-card" style="top: 15px; left: 50%; transform: translateX(-50%);" onclick="selectPlayer('Alisher')">
+            <img class="avatar" src="https://cdn-icons-png.flaticon.com/512/847/847969.png" alt="User">
+            <span style="background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 8px; margin-top: 2px;">Alisher</span>
+        </div>
+        <div class="player-card" style="bottom: 15px; left: 20%;" onclick="selectPlayer('Madina')">
+            <img class="avatar" src="https://cdn-icons-png.flaticon.com/512/145/145867.png" alt="User">
+            <span style="background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 8px; margin-top: 2px;">Madina</span>
+        </div>
+
+        <!-- Shisha -->
+        <div class="bottle" id="bottle" onclick="spinBottle()"></div>
+
+        <!-- O'pishish / Tanlov oynasi -->
+        <div class="action-popup" id="actionPopup">
+            <div style="font-size: 12px; font-weight: bold; margin-bottom: 4px;" id="popupTitle">Tanlov</div>
+            <div class="action-btn-group">
+                <button class="action-btn btn-kiss" onclick="handleKiss(true)">💋 Poceловать</button>
+                <button class="action-btn btn-decline" onclick="handleKiss(false)">❌ Otkazish</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Panel: Gifts & Chat -->
+    <div class="bottom-panel">
+        <div style="font-size: 10px; font-weight: bold; color: #555;">
+            🎁 Oluvchi: <span id="displayTargetName" style="color: #c62828;">Barchaga</span>
+        </div>
+        <div class="gift-grid">
+            <div class="gift-item" onclick="sendGift('💋', 10)"><span>💋</span><span>10 ❤️</span></div>
+            <div class="gift-item" onclick="sendGift('🌹', 50)"><span>🌹</span><span>50 ❤️</span></div>
+            <div class="gift-item" onclick="sendGift('👑', 200)"><span>👑</span><span>200 ❤️</span></div>
+            <div class="gift-item" onclick="sendGift('💎', 500)"><span>💎</span><span>500 ❤️</span></div>
+            <div class="gift-item" onclick="sendGift('🏎️', 1000)"><span>🏎️</span><span>1k ❤️</span></div>
+            <div class="gift-item" onclick="sendGift('🧸', 1500)"><span>🧸</span><span>1.5k ❤️</span></div>
+        </div>
+
+        <!-- Chat Section -->
+        <div class="chat-box" id="chatBox">
+            <div><b>Tizim:</b> O‘yinga xush kelibsiz! Shishani aylantiring.</div>
+        </div>
+        <div class="chat-input-group">
+            <input type="text" id="chatInput" class="chat-input" placeholder="Xabar yozing...">
+            <button class="send-btn" onclick="sendMessage()">Yuborish</button>
+        </div>
+    </div>
+
+    <!-- Leaderboard Modal -->
+    <div class="modal" id="leaderboardModal">
+        <div class="modal-content">
+            <h3>🏆 Reyting</h3>
+            <div class="tab-group">
+                <button class="tab-btn active" onclick="switchRankTab('emotional')">Hissiy</button>
+                <button class="tab-btn" onclick="switchRankTab('kissed')">O‘pishgan</button>
+                <button class="tab-btn" onclick="switchRankTab('dj')">DJ</button>
+                <button class="tab-btn" onclick="switchRankTab('rich')">Boy</button>
+            </div>
+            <div id="rankList" style="font-size: 11px; text-align: left; max-height: 140px; overflow-y: auto; line-height: 1.6;">
+                <!-- Dinamik reyting -->
+            </div>
+            <button onclick="closeModal('leaderboardModal')" style="margin-top: 10px; padding: 4px 12px; background: #5d3a1a; color: white; border: none; border-radius: 6px; cursor: pointer;">Yopish</button>
+        </div>
+    </div>
+
+    <!-- Tables Modal -->
+    <div class="modal" id="tablesModal">
+        <div class="modal-content">
+            <h3>🪑 Stollar</h3>
+            <p style="font-size: 10px; color: #aaa; margin-bottom: 8px;">Boshqa stolga o‘tish:</p>
+            <div class="table-item" onclick="changeTable(3001)"><span>Стол #3001</span><span>👤 1</span></div>
+            <div class="table-item" onclick="changeTable(3002)"><span>Стол #3002</span><span>👤 2</span></div>
+            <div class="table-item" onclick="changeTable(3003)"><span>Стол #3003</span><span>👤 7</span></div>
+            <div class="table-item" onclick="changeTable(3004)"><span>Стол #3004</span><span>👤 3</span></div>
+            <button onclick="closeModal('tablesModal')" style="margin-top: 10px; padding: 4px 12px; background: #5d3a1a; color: white; border: none; border-radius: 6px; cursor: pointer;">Yopish</button>
+        </div>
+    </div>
+
+    <!-- Shop Modal (Sizning shaxsiy lichkangizga yo'naltirish) -->
+    <div class="modal" id="shopModal">
+        <div class="modal-content">
+            <h3>🛒 Yurakchalar Do'koni</h3>
+            <p style="font-size: 10px; color: #aaa; margin-bottom: 8px;">Bonus sotib olish uchun adminga yozing:</p>
+            <div class="shop-item">
+                <span>❤️ 50,000 bonus</span>
+                <button class="buy-btn" onclick="buyViaAdmin('50,000')">Sotib olish</button>
+            </div>
+            <div class="shop-item">
+                <span>❤️ 200,000 bonus</span>
+                <button class="buy-btn" onclick="buyViaAdmin('200,000')">Sotib olish</button>
+            </div>
+            <div class="shop-item">
+                <span>❤️ 500,000 bonus</span>
+                <button class="buy-btn" onclick="buyViaAdmin('500,000')">Sotib olish</button>
+            </div>
+            <button onclick="closeModal('shopModal')" style="margin-top: 10px; padding: 4px 12px; background: #5d3a1a; color: white; border: none; border-radius: 6px; cursor: pointer;">Yopish</button>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        const user = tg.initDataUnsafe?.user;
+        const username = user ? user.first_name : "Mehmon";
+
+        let hearts = parseInt(localStorage.getItem('user_hearts'));
+        if (isNaN(hearts)) hearts = 10000; // Yangi o'yinchiga 10k bonus
+        document.getElementById('my-hearts').innerText = hearts;
+
+        // Chat funksiyasi
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            if (input.value.trim() !== "") {
+                const chatBox = document.getElementById('chatBox');
+                chatBox.innerHTML += `<div><b>${username}:</b> ${input.value}</div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+                socket.emit('chatMessage', { user: username, text: input.value });
+                input.value = "";
+            }
+        }
+
+        // Sovg'a yuborish
+        let activeTarget = "Barchaga";
+        function selectPlayer(name) {
+            activeTarget = name;
+            document.getElementById('displayTargetName').innerText = name;
+        }
+
+        function sendGift(icon, cost) {
+            if (hearts >= cost) {
+                hearts -= cost;
+                localStorage.setItem('user_hearts', hearts);
+                document.getElementById('my-hearts').innerText = hearts;
+                const chatBox = document.getElementById('chatBox');
+                chatBox.innerHTML += `<div>🎁 <b>${username}</b> -> <b>${activeTarget}</b> ga ${icon} sovg'a qildi!</div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            } else {
+                alert("Yurakchalar yetarli emas!");
+            }
+        }
+
+        // Stolni o'zgartirish
+        function changeTable(tableNum) {
+            document.getElementById('currentTableNum').innerText = tableNum;
+            closeModal('tablesModal');
+            socket.emit('joinTable', { tableId: 'table_' + tableNum });
+            const chatBox = document.getElementById('chatBox');
+            chatBox.innerHTML += `<div>🪑 Siz Stol #${tableNum} ga o'tdingiz.</div>`;
+        }
+
+        // Admin shaxsiy lichkasiga o'tish (O'z Telegram username'ingizni shu yerga yozing)
+        function buyViaAdmin(title) {
+            const myUsername = "khayitboev_2001"; // <--- SHU YERGA O'ZINGizning TELEGRAM USERNAME'INGIZNI YOZING
+            const text = encodeURIComponent(`Salom! Men ${title} yurak bonusini sotib olmoqchiman. Foydalanuvchi: ${username}`);
+            window.open(`https://t.me/${myUsername}?text=${text}`, '_blank');
+        }
+
+        // Reyting Ma'lumotlari
+        const ratings = {
+            emotional: [`1. Ali — 26,766 ❤️`, `2. QASSO — 23,507 ❤️`, `3. ${username} — ${hearts} ❤️`],
+            kissed: [`1. OMONOV — 67,181 💋`, `2. ${username} — ${hearts} 💋`, `3. Umidovich — 18,466 💋`],
+            dj: [`1. WAGNER — 28,010 🎵`, `2. GADAY — 21,900 🎵`, `3. ${username} — ${hearts} 🎵`],
+            rich: [`1. Wagner — 261 💎`, `2. Gaday — 259 💎`, `3. ${username} — ${hearts} 💎`]
+        };
+
+        function switchRankTab(type) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('rankList').innerHTML = ratings[type].join('<br>');
+        }
+        document.getElementById('rankList').innerHTML = ratings.emotional.join('<br>');
+
+        // Modallar
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        // Socket.io & Shishani aylantirish
+        const socket = io('https://bottle-game-oq5s.onrender.com');
+        socket.emit('joinTable', { tableId: 'table_3001' });
+
+        function spinBottle() {
+            const randomAngle = Math.floor(Math.random() * 360) + 1440;
+            socket.emit('spinBottle', { tableId: 'table_3001', angle: randomAngle });
+        }
+
+        socket.on('bottleSpun', (data) => {
+            const bottle = document.getElementById('bottle');
+            bottle.style.transform = `rotate(${data.angle}deg)`;
+            
+            setTimeout(() => {
+                document.getElementById('popupTitle').innerText = "Tanlov: Alisher bilan o'pishasizmi?";
+                document.getElementById('actionPopup').style.display = 'block';
+                document.getElementById('actionPopup').style.top = '40%';
+                document.getElementById('actionPopup').style.left = '50%';
+                document.getElementById('actionPopup').style.transform = 'translate(-50%, -50%)';
+            }, 4000);
+        });
+
+        function handleKiss(isAccepted) {
+            document.getElementById('actionPopup').style.display = 'none';
+            const chatBox = document.getElementById('chatBox');
+            if(isAccepted) {
+                chatBox.innerHTML += `<div>💋 <b>${username}</b> taklifni qabul qildi va o'pishdi!</div>`;
+            } else {
+                chatBox.innerHTML += `<div>❌ <b>${username}</b> taklifni rad etdi.</div>`;
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+</body>
+</html>
