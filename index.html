@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍾 Spin The Bottle</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>🍾 Spin The Bottle</h1>
+
+    <div class="players">
+
+        <input id="playerName" type="text" placeholder="O'yinchi ismi">
+
+        <button id="addPlayer">
+            ➕ Qo'shish
+        </button>
+
+    </div>
+
+    <ul id="playerList"></ul>
+
+    <div class="bottle-area">
+
+        <img
+            src="bottle.png"
+            id="bottle"
+            draggable="false"
+        >
+
+    </div>
+
+    <button id="spin">
+        🍾 Aylantirish
+    </button>
+
+    <div id="result">
+        Ishtirokchi tanlanmagan
+    </div>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
