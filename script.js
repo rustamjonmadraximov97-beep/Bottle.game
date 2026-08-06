@@ -50,3 +50,37 @@ window.addEventListener('click', (e) => {
         giftModal.style.display = 'none';
     }
 });
+// --- YANI QO'SHILGAN QISM ---
+const spinSound = new Audio('https://www.myinstants.com/media/sounds/wheel-spin.mp3');
+
+function playSpinSound() {
+    spinSound.currentTime = 0;
+    spinSound.play().catch(e => console.log("Audio block: ", e));
+}
+// ----------------------------
+
+// Telegram WebApp integratsiyasi
+const tg = window.Telegram.WebApp;
+tg.expand();
+
+// ... (oldingi kodlaringiz shu yerda qoladi)
+
+function spinBottle() {
+    if (isSpinning) return;
+    
+    playSpinSound(); // <--- Ovozni shu yerda chaqiramiz
+    
+    isSpinning = true;
+
+    // Tasodifiy aylanish darajasi
+    const randomDegree = Math.floor(Math.random() * 360) + 1800;
+    currentRotation += randomDegree;
+
+    bottle.style.transform = `rotate(${currentRotation}deg)`;
+
+    setTimeout(() => {
+        isSpinning = false;
+    }, 3000);
+}
+
+// ... (qolgan kodlaringiz)
